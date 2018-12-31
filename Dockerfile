@@ -17,4 +17,4 @@ RUN npx babel src --out-dir lib --source-maps-inline
 
 EXPOSE 7000
 
-CMD ["node", "lib/payserver.js"]
+CMD ["node", "lib/receipt.js"]

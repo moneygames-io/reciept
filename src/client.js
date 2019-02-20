@@ -45,7 +45,7 @@ export default class Client {
             var response = {
                 'token': this.token,
                 'gameserverid': gameserverid,
-                'pot': pot,
+                'winnings': winnings,
                 'destinationAddress': destinationAddress,
                 'transactionId': transactionId
             }

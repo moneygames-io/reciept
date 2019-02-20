@@ -10,7 +10,7 @@ class Reciept {
         const network = Network.get(process.env.NET);
         const walletOptions = {
             port: network.walletPort,
-            host: process.env.NET + ".moneygames.io",
+            host: process.env.HOST,
             network: network.type,
             apiKey: process.env.APIKEY,
             ssl: (process.env.SSL === 'true')

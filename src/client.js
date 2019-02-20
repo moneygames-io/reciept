@@ -18,6 +18,7 @@ export default class Client {
     async payout(response) {
         try {
             var data = JSON.parse(response)
+            this.token = data['token'];
             const getPlayerAsync = promisify(this.redisClientPlayers.hget).bind(this.redisClientPlayers);
             const getGamesAsync = promisify(this.redisClientGames.hget).bind(this.redisClientGames);
             const getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
@@ -70,8 +71,8 @@ export default class Client {
         const result = await wallet.getAccount(token);
         if (result) {
             if (result.balance.confirmed >= 15000) {
-                this.redisClientPlayers.hset(this.token, 'confirmed', 'true');
-                this.redisClientPlayers.hset(this.token, 'confirmed', result.balance.confirmed.toString());
+                this.redisClientPlayers.hset(token, 'confirmed', 'true');
+                this.redisClientPlayers.hset(token, 'confirmed', result.balance.confirmed.toString());
                 return result.balance.confirmed;
             }
         }

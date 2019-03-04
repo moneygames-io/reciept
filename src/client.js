@@ -19,11 +19,12 @@ export default class Client {
         try {
             var data = JSON.parse(response)
             this.token = data['token'];
+            this.receipt.clients[this.token] = this;
             const getPlayerAsync = promisify(this.redisClientPlayers.hget).bind(this.redisClientPlayers);
             const getGamesAsync = promisify(this.redisClientGames.hget).bind(this.redisClientGames);
             const getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
             const getConfirmedAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
-            const gameserverid = await getPlayerAsync(data['token'], 'game');
+            const gameserverid = await getPlayerAsync(this.token, 'game');
             const pot = await getGamesAsync(gameserverid, 'unconfirmed');
             const playersInGame = await getPlayersInGameAsync(gameserverid);
             const winnings = parseInt(pot * this.winnersPercentage);

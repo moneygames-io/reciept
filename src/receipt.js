@@ -7,20 +7,27 @@ import Client from './client';
 
 class Reciept {
     constructor() {
-        const network = Network.get(process.env.NET);
-        const walletOptions = {
-            port: network.walletPort,
-            host: process.env.HOST,
-            network: network.type,
-            apiKey: process.env.APIKEY,
-            ssl: (process.env.SSL === 'true')
-        };
-        this.walletClient = new WalletClient(walletOptions);
-        this.redisClientPlayers = this.connectToRedis(6379, 'redis-players')
-        this.redisClientGames = this.connectToRedis(6379, 'redis-gameservers')
+        this.redisClientPlayers = this.connectToRedis(6379, 'redis-players');
+        this.redisClientGames = this.connectToRedis(6379, 'redis-gameservers');
+        this.clients = {};
         this.server = new WebSocket.Server({ port: 7002 });
-        this.clients = [];
         this.server.on('connection', this.newWinner.bind(this));
+        if (process.env.NET == 'main' || process.env.NET == 'testnet') {
+            const network = Network.get(process.env.NET);
+            const walletOptions = {
+                port: network.walletPort,
+                host: process.env.BCOIN,
+                network: network.type,
+                apiKey: process.env.APIKEY,
+                ssl: (process.env.SSL === 'true')
+            };
+            this.walletClient = new WalletClient(walletOptions);
+            this.wallet = this.walletClient.wallet('primary');
+            (async () => {
+                const result = await this.wallet.getAccount('default');
+                this.defaultAccount = result;
+            })();
+        }
     }
 
     connectToRedis(port, name) {
@@ -36,7 +43,6 @@ class Reciept {
 
     newWinner(connection) {
         var client = new Client(connection, this)
-        this.clients.push(client);
     }
 }
 

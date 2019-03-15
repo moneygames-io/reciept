@@ -10,7 +10,9 @@ export default class Client {
         this.redisClientPlayers = receipt.redisClientPlayers;
         this.redisClientGames = receipt.redisClientGames;
         this.walletClient = receipt.walletClient;
+        this.wallet = receipt.wallet;
         this.winnersPercentage = 0.99;
+        this.rate = 1000
         this.connection = conn;
         this.connection.on('message', this.payout.bind(this));
     }
@@ -27,7 +29,7 @@ export default class Client {
             const gameserverid = await getPlayerAsync(this.token, 'game');
             const pot = await getGamesAsync(gameserverid, 'unconfirmed');
             const playersInGame = await getPlayersInGameAsync(gameserverid);
-            const winnings = parseInt(pot * this.winnersPercentage);
+            const winnings = parseInt((pot * this.winnersPercentage) - this.rate);
             var confirmed = 0;
             var incr = 0;
             console.log(playersInGame);
@@ -58,18 +60,16 @@ export default class Client {
     }
 
     async sendWinnings(address, value) {
-        const wallet = this.walletClient.wallet('primary');
         const options = {
             rate: this.rate,
             outputs: [{ value: value, address: address }]
         };
-        const result = await wallet.send(options);
+        const result = await this.wallet.send(options);
         return result['hash']; // return transaction id
     }
 
     async pollBalanceConfirmed(token) {
-        const wallet = this.walletClient.wallet('primary');
-        const result = await wallet.getAccount(token);
+        const result = await this.wallet.getAccount(token);
         if (result) {
             if (result.balance.confirmed >= 15000) {
                 this.redisClientPlayers.hset(token, 'confirmed', 'true');

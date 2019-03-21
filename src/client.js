@@ -37,11 +37,10 @@ export default class Client {
                 confirmed = 0;
                 pendingTransactions = [];
                 for (var p in playersInGame) {
-                    console.log("player->" + playersInGame[p]);
                     incr = await this.pollBalanceConfirmed(playersInGame[p]);
                     if (incr == 0) {
                         const pendingTX = await getPlayerAsync(this.token, 'transactionId');
-                        pendingTransactions += pendingTX
+                        pendingTransactions += pendingTX;
                     }
                     confirmed += incr;
                 }
@@ -52,7 +51,6 @@ export default class Client {
                     'pendingTransactions': pendingTransactions
                 }
                 this.connection.send(JSON.stringify(response));
-                console.log("total->" + confirmed)
                 await this.sleep(15 * 1000); //sleep for 15 seconds
             }
             const destinationAddress = data['destinationAddress'].trim();

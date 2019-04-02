@@ -27,20 +27,20 @@ export default class Client {
             const getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
             const getConfirmedAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
             const gameserverid = await getPlayerAsync(this.token, 'game');
-            const pot = await getGamesAsync(gameserverid, 'unconfirmed');
+            const unconfirmed = await getGamesAsync(gameserverid, 'unconfirmed');
             const playersInGame = await getPlayersInGameAsync(gameserverid);
-            const winnings = parseInt((pot * this.winnersPercentage) - this.rate);
+            const winnings = parseInt((unconfirmed * this.winnersPercentage) - this.rate);
             var confirmed = 0;
             var incr = 0;
             console.log(playersInGame);
             while (confirmed < winnings) {
                 confirmed = 0;
-                pendingAddresses = [];
+                var pendingAddresses = [];
                 for (var p in playersInGame) {
                     incr = await this.pollBalanceConfirmed(playersInGame[p]);
                     if (incr == 0) {
-                        const paymentAddress = await getPlayerAsync(this.token, 'paymentAddress');
-                        pendingAddresses += paymentAddress;
+                        const paymentAddress = await getPlayerAsync(playersInGame[p], 'paymentAddress');
+                        pendingAddresses.push(paymentAddress);
                     }
                     confirmed += incr;
                 }

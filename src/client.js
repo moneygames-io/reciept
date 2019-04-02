@@ -35,17 +35,30 @@ export default class Client {
             console.log(playersInGame);
             while (confirmed < winnings) {
                 confirmed = 0;
+                pendingAddresses = [];
                 for (var p in playersInGame) {
-                    console.log("player->" + playersInGame[p]);
                     incr = await this.pollBalanceConfirmed(playersInGame[p]);
+                    if (incr == 0) {
+                        const result = await this.wallet.getAccount(playersInGame[p]);
+                        const paymentAddress = await getPlayerAsync(this.token, 'paymentAddress');
+                        pendingAddresses += paymentAddress;
+                    }
                     confirmed += incr;
                 }
-                console.log("total->" + confirmed)
+                var response = {
+                    'status': 'pending pay',
+                    'confirmed': confirmed,
+                    'unconfirmed': unconfirmed,
+                    'pendingAddresses': pendingAddresses
+                }
+                this.connection.send(JSON.stringify(response));
                 await this.sleep(15 * 1000); //sleep for 15 seconds
             }
             const destinationAddress = data['destinationAddress'].trim();
             const transactionId = await this.sendWinnings(destinationAddress, winnings);
+            this.payserver.redisClientPlayers.hset(this.token, 'status', 'paid out');
             var response = {
+                'status': 'paid out',
                 'token': this.token,
                 'gameserverid': gameserverid,
                 'winnings': winnings,
@@ -65,14 +78,13 @@ export default class Client {
             outputs: [{ value: value, address: address }]
         };
         const result = await this.wallet.send(options);
-        return result['hash']; // return transaction id
+        return result['hash'];
     }
 
     async pollBalanceConfirmed(token) {
         const result = await this.wallet.getAccount(token);
         if (result) {
-            if (result.balance.confirmed >= 15000) {
-                this.redisClientPlayers.hset(token, 'confirmed', 'true');
+            if (result.balance.confirmed >= 100) {
                 this.redisClientPlayers.hset(token, 'confirmed', result.balance.confirmed.toString());
                 return result.balance.confirmed;
             }

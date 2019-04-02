@@ -35,12 +35,13 @@ export default class Client {
             console.log(playersInGame);
             while (confirmed < winnings) {
                 confirmed = 0;
-                pendingTransactions = [];
+                pendingAddresses = [];
                 for (var p in playersInGame) {
                     incr = await this.pollBalanceConfirmed(playersInGame[p]);
                     if (incr == 0) {
-                        const pendingTX = await getPlayerAsync(this.token, 'transactionId');
-                        pendingTransactions += pendingTX;
+                        const result = await this.wallet.getAccount(playersInGame[p]);
+                        const paymentAddress = await getPlayerAsync(this.token, 'paymentAddress');
+                        pendingAddresses += paymentAddress;
                     }
                     confirmed += incr;
                 }
@@ -48,7 +49,7 @@ export default class Client {
                     'status': 'pending pay',
                     'confirmed': confirmed,
                     'unconfirmed': unconfirmed,
-                    'pendingTransactions': pendingTransactions
+                    'pendingAddresses': pendingAddresses
                 }
                 this.connection.send(JSON.stringify(response));
                 await this.sleep(15 * 1000); //sleep for 15 seconds

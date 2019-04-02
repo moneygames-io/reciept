@@ -39,7 +39,6 @@ export default class Client {
                 for (var p in playersInGame) {
                     incr = await this.pollBalanceConfirmed(playersInGame[p]);
                     if (incr == 0) {
-                        const result = await this.wallet.getAccount(playersInGame[p]);
                         const paymentAddress = await getPlayerAsync(this.token, 'paymentAddress');
                         pendingAddresses += paymentAddress;
                     }

@@ -2,7 +2,7 @@ import { WalletClient } from 'bclient';
 import { Network } from 'bcoin';
 import WebSocket from 'ws';
 import redis from 'redis';
-
+import { promisify } from 'util';
 import Client from './client';
 
 class Reciept {
@@ -12,7 +12,7 @@ class Reciept {
         this.getPlayerAsync = promisify(this.redisClientPlayers.hget).bind(this.redisClientPlayers);
         this.getGamesAsync = promisify(this.redisClientGames.hget).bind(this.redisClientGames);
         this.getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
-        this.removePlayerInGameAsync = promsify(this.redisClientPlayers.srem).bind(this.redisClientPlayers);
+        this.removePlayerInGameAsync = promisify(this.redisClientPlayers.srem).bind(this.redisClientPlayers);
         this.getConfirmedAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
         this.winnersPercentage = 0.99;
         this.rate = 1000;
@@ -43,7 +43,7 @@ class Reciept {
             console.log("connected " + name)
         });
         client.on('error', function(err) {
-            console.log('Something went wrong ', err)
+            //console.log('Something went wrong ', err)
         });
         return client
     }

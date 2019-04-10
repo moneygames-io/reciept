@@ -1,7 +1,6 @@
 import { WebSocket } from 'ws'
 import { WalletClient } from 'bclient'
 import { Network } from 'bcoin'
-import { promisify } from 'util'
 
 
 export default class Client {
@@ -13,9 +12,8 @@ export default class Client {
 
     async initiatePayout(response) {
         try {
-            var data = JSON.parse(response)
-
             // get user data from message
+            var data = JSON.parse(response)
             this.token = data['token'];
             this.destinationAddress = data['destinationAddress'].trim();
             this.receipt.clients[this.token] = this;
@@ -25,26 +23,48 @@ export default class Client {
             this.gameserverid = await this.receipt.getPlayerAsync(this.token, 'game');
             this.unconfirmed = await this.receipt.getGamesAsync(this.gameserverid, 'unconfirmed');
 
+            // error out on wrong inputs
+            if (this.status != 'won') {
+                throw "player did not win"
+            }
+            if (this.destinationAddress.length != 34) {
+                throw "invalid bitcoin address"
+            }
+
             // update redis
             this.status = 'pending pay'
+            this.confirmed = 0;
             this.winnings = parseInt((this.unconfirmed * this.receipt.winnersPercentage) - this.receipt.rate);
             this.receipt.redisClientPlayers.hset(this.token, 'winnings', this.winnings);
             this.receipt.redisClientPlayers.hset(this.token, 'status', this.status);
 
+            //update the client
+            var response = {
+                'status': this.status,
+                'token': this.token,
+                'gameserverid': this.gameserverid,
+                'unconfirmed': this.unconfirmed,
+                'confirmed': this.confirmed,
+                'winnings': this.winnings,
+                'destinationAddress': this.destinationAddress
+            }
+            this.connection.send(JSON.stringify(response));
+
+
             while (this.confirmed < this.winnings) {
                 this.confirmed = 0;
                 this.playersInGame = await this.receipt.getPlayersInGameAsync(this.gameserverid);
-                for (var p in playersInGame) {
 
-                    // check player from game for confirmed amount
-                    var result = await this.receipt.wallet.getAccount(token);
-                    if (result && result.balance.confirmed >= 1) {
+                // check player from game for confirmed amount
+                for (var p in this.playersInGame) {
+                    var result = await this.receipt.wallet.getAccount(this.playersInGame[p]);
+                    if (result && result.balance.confirmed >= 100) {
                         this.confirmed += result.balance.confirmed;
-                        this.receipt.removePlayerInGameAsync(this.gameserverid, playersInGame[p])
+                        this.receipt.removePlayerInGameAsync(this.gameserverid, this.playersInGame[p])
                     }
                 }
                 // update redis
-                this.receipt.redisClientPlayers.hset(this.token, 'confirmed', this.confirmed);
+                this.receipt.redisClientGames.hset(this.gameserverid, 'confirmed', this.confirmed);
                 await this.sleep(15 * 1000); // sleep for 15 seconds
             }
 
@@ -60,6 +80,7 @@ export default class Client {
             this.status = 'paid out'
             this.receipt.redisClientPlayers.hset(this.token, 'status', this.status);
             this.receipt.redisClientPlayers.hset(this.token, 'transactionId', this.transactionId);
+
         } catch (err) {
             console.log("error paying winner: " + err)
             this.connection.send(JSON.stringify({ 'error': err }));

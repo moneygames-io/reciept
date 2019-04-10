@@ -7,88 +7,65 @@ import { promisify } from 'util'
 export default class Client {
     constructor(conn, receipt) {
         this.receipt = receipt;
-        this.redisClientPlayers = receipt.redisClientPlayers;
-        this.redisClientGames = receipt.redisClientGames;
-        this.walletClient = receipt.walletClient;
-        this.wallet = receipt.wallet;
-        this.winnersPercentage = 0.99;
-        this.rate = 1000
         this.connection = conn;
-        this.connection.on('message', this.payout.bind(this));
+        this.connection.on('message', this.initiatePayout.bind(this));
     }
 
-    async payout(response) {
+    async initiatePayout(response) {
         try {
             var data = JSON.parse(response)
+
             this.token = data['token'];
+            this.destinationAddress = data['destinationAddress'].trim();
             this.receipt.clients[this.token] = this;
-            const getPlayerAsync = promisify(this.redisClientPlayers.hget).bind(this.redisClientPlayers);
-            const getGamesAsync = promisify(this.redisClientGames.hget).bind(this.redisClientGames);
-            const getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
-            const getConfirmedAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
-            const gameserverid = await getPlayerAsync(this.token, 'game');
-            const unconfirmed = await getGamesAsync(gameserverid, 'unconfirmed');
-            const playersInGame = await getPlayersInGameAsync(gameserverid);
-            const winnings = parseInt((unconfirmed * this.winnersPercentage) - this.rate);
-            var confirmed = 0;
-            var incr = 0;
-            console.log(playersInGame);
-            while (confirmed < winnings) {
-                confirmed = 0;
-                var pendingAddresses = [];
+
+            this.status = await this.receipt.getPlayerAsync(this.token, 'status');
+            this.gameserverid = await this.receipt.getPlayerAsync(this.token, 'game');
+            this.unconfirmed = await this.receipt.getGamesAsync(this.gameserverid, 'unconfirmed');
+
+            this.status = 'pending pay'
+            this.winnings = parseInt((this.unconfirmed * this.receipt.winnersPercentage) - this.receipt.rate);
+            this.receipt.redisClientPlayers.hset(this.token, 'winnings', this.winnings);
+            this.receipt.redisClientPlayers.hset(this.token, 'status', this.status);
+
+            while (this.confirmed < this.winnings) {
+                this.confirmed = 0;
+                this.playersInGame = await this.receipt.getPlayersInGameAsync(this.gameserverid);
                 for (var p in playersInGame) {
-                    incr = await this.pollBalanceConfirmed(playersInGame[p]);
-                    if (incr == 0) {
-                        const paymentAddress = await getPlayerAsync(playersInGame[p], 'paymentAddress');
-                        pendingAddresses.push(paymentAddress);
+
+                    var incr = 0
+                    var result = await this.receipt.wallet.getAccount(token);
+
+                    if (result && result.balance.confirmed >= 1) {
+                        this.receipt.redisClientPlayers.hset(token, 'confirmed', result.balance.confirmed.toString());
+                        incr = result.balance.confirmed;
                     }
-                    confirmed += incr;
+
+                    if (incr > 0) {
+                        this.receipt.removePlayerInGameAsync(this.gameserverid, playersInGame[p])
+                    }
+
+                    this.confirmed += incr;
+                    this.receipt.redisClientPlayers.hset(this.token, 'status', this.confirmed);
                 }
-                var response = {
-                    'status': 'pending pay',
-                    'confirmed': confirmed,
-                    'unconfirmed': unconfirmed,
-                    'pendingAddresses': pendingAddresses
-                }
-                this.connection.send(JSON.stringify(response));
                 await this.sleep(15 * 1000); //sleep for 15 seconds
             }
-            const destinationAddress = data['destinationAddress'].trim();
-            const transactionId = await this.sendWinnings(destinationAddress, winnings);
-            this.payserver.redisClientPlayers.hset(this.token, 'status', 'paid out');
-            var response = {
-                'status': 'paid out',
-                'token': this.token,
-                'gameserverid': gameserverid,
-                'winnings': winnings,
-                'destinationAddress': destinationAddress,
-                'transactionId': transactionId
-            }
-            this.connection.send(JSON.stringify(response));
+
+            const options = {
+                rate: this.receipt.rate,
+                outputs: [{ value: this.winnings, address: this.destinationAddress }]
+            };
+
+            var result = await this.receipt.wallet.send(options);
+            this.transactionId = result['hash'];
+
+            this.status = 'paid out'
+            this.receipt.redisClientPlayers.hset(this.token, 'status', this.status);
+            this.receipt.redisClientPlayers.hset(this.token, 'transactionId', this.transactionId);
         } catch (err) {
             console.log("error paying winner: " + err)
             this.connection.send(JSON.stringify({ 'error': err }));
         }
-    }
-
-    async sendWinnings(address, value) {
-        const options = {
-            rate: this.rate,
-            outputs: [{ value: value, address: address }]
-        };
-        const result = await this.wallet.send(options);
-        return result['hash'];
-    }
-
-    async pollBalanceConfirmed(token) {
-        const result = await this.wallet.getAccount(token);
-        if (result) {
-            if (result.balance.confirmed >= 100) {
-                this.redisClientPlayers.hset(token, 'confirmed', result.balance.confirmed.toString());
-                return result.balance.confirmed;
-            }
-        }
-        return 0;
     }
 
     sleep(ms) {

@@ -9,6 +9,13 @@ class Reciept {
     constructor() {
         this.redisClientPlayers = this.connectToRedis(6379, 'redis-players');
         this.redisClientGames = this.connectToRedis(6379, 'redis-gameservers');
+        this.getPlayerAsync = promisify(this.redisClientPlayers.hget).bind(this.redisClientPlayers);
+        this.getGamesAsync = promisify(this.redisClientGames.hget).bind(this.redisClientGames);
+        this.getPlayersInGameAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
+        this.removePlayerInGameAsync = promsify(this.redisClientPlayers.srem).bind(this.redisClientPlayers);
+        this.getConfirmedAsync = promisify(this.redisClientPlayers.smembers).bind(this.redisClientPlayers);
+        this.winnersPercentage = 0.99;
+        this.rate = 1000;
         this.clients = {};
         this.server = new WebSocket.Server({ port: 7002 });
         this.server.on('connection', this.newWinner.bind(this));

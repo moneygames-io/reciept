@@ -37,7 +37,7 @@ export default class Client {
             this.winnings = parseInt((this.unconfirmed * this.receipt.winnersPercentage) - this.receipt.rate);
             this.receipt.redisClientPlayers.hset(this.token, 'winnings', this.winnings);
             this.receipt.redisClientPlayers.hset(this.token, 'status', this.status);
-            this.receipt.redisClientGames.hset(this.token, 'destinationAddress', this.destinationAddress);
+            this.receipt.redisClientGames.hset(this.gameserverid, 'destinationAddress', this.destinationAddress);
 
             //update the client
             var response = {
